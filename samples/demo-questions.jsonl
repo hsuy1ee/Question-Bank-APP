@@ -1,3 +1,3 @@
-{"id":"demo-single-001","type":"single","question":"JSONL 题库中推荐一行保存几道题？","options":["一道题","一个章节","一个题库","不限数量"],"answer":["A"],"explanation":"JSONL 适合一行一条记录，便于定位导入错误。","tags":["题库格式"],"difficulty":"easy","source":"demo"}
-{"id":"demo-multiple-001","type":"multiple","question":"以下哪些数据适合保存在软件内部数据库中？","options":["答题次数","错题记录","收藏状态","原始安装包"],"answer":["A","B","C"],"explanation":"答题次数、错题记录和收藏状态都是运行时产生的数据，适合存入 SQLite。","tags":["本地存储"],"difficulty":"medium","source":"demo"}
-{"id":"demo-judge-001","type":"judge","question":"判断题的 answer 可以使用 [\"true\"] 或 [\"false\"]。","answer":["true"],"explanation":"本项目第一版用字符串数组统一保存答案。","tags":["题型"],"difficulty":"easy","source":"demo"}
+{"id":"demo-single-001","type":"单选","question":"JSONL 题库中推荐一行保存几道题？","options":["一道题","一个章节","一个题库","不限数量"],"answer":["A"],"explanation":"答案：A","difficulty":"easy","source":"demo"}
+{"id":"demo-multiple-001","type":"多选","question":"以下哪些数据适合保存在软件内部数据库中？","options":["答题次数","错题记录","收藏状态","原始安装包"],"answer":["A","B","C"],"explanation":"答案：ABC","difficulty":"medium","source":"demo"}
+{"id":"demo-judge-001","type":"判断","question":"判断题的 answer 可以使用 [\"true\"] 或 [\"false\"]。","answer":["true"],"explanation":"答案：TRUE","difficulty":"easy","source":"demo"}

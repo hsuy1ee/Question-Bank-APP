@@ -80,16 +80,23 @@ function Complete-Question {
   $answerText = $answerLine.Substring($colonIndex + 1).Trim()
   $match = [regex]::Match($answerText, "^([A-Z]+)")
   if (-not $match.Success) {
+    $match = [regex]::Match($answerText, "(TRUE|FALSE)", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+  }
+  if (-not $match.Success) {
     throw "Question $($Question.id) has invalid answer: $answerLine"
   }
-  $answerLetters = $match.Groups[1].Value.ToCharArray() | ForEach-Object { [string]$_ }
+  $answerToken = $match.Groups[1].Value.ToUpperInvariant()
+  $answerLetters = $answerToken.ToCharArray() | ForEach-Object { [string]$_ }
   $type = [string]$Question.type
   $answer = [System.Collections.Generic.List[string]]::new()
+  $explanation = $answerLine
   if ($type -eq "judge") {
-    if ($answerLetters[0] -eq "A") {
+    if ($answerToken -eq "TRUE" -or $answerLetters[0] -eq "A") {
       $answer.Add("true")
+      $explanation = (([string][char]0x7B54) + ([string][char]0x6848) + ([string][char]0xFF1A) + "TRUE")
     } else {
       $answer.Add("false")
+      $explanation = (([string][char]0x7B54) + ([string][char]0x6848) + ([string][char]0xFF1A) + "FALSE")
     }
   } else {
     foreach ($letter in $answerLetters) {
@@ -99,11 +106,10 @@ function Complete-Question {
 
   $item = [ordered]@{
     id = $Question.id
-    type = $type
+    type = $Question.chineseType
     question = (($Question.questionParts -join " ") -replace "\s+", " ").Trim()
     answer = $answer
-    explanation = $answerLine
-    tags = @($Question.chineseType)
+    explanation = $explanation
     source = [System.IO.Path]::GetFileNameWithoutExtension($InputDocx)
   }
 
