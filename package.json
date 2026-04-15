@@ -26,6 +26,7 @@
       "node_modules/sql.js/dist/sql-wasm.wasm"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis"
