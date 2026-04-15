@@ -1,0 +1,220 @@
+:root {
+  font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  color: #1d2433;
+  background: #f7f8fb;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, select { font: inherit; }
+
+button {
+  border: 1px solid #d9dfeb;
+  background: #fff;
+  color: #1d2433;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+button:disabled { cursor: not-allowed; opacity: .55; }
+
+select {
+  min-width: 260px;
+  border: 1px solid #d9dfeb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #1d2433;
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #182235;
+  color: #fff;
+  padding: 24px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: #28a86b;
+  font-weight: 800;
+}
+
+.brand small {
+  display: block;
+  color: #bac6d8;
+  margin-top: 4px;
+}
+
+.nav {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 10px;
+  border-color: transparent;
+  background: transparent;
+  color: #dce5f2;
+}
+
+.nav.active, .nav:hover {
+  background: #243149;
+  color: #fff;
+}
+
+.content { padding: 32px; }
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; font-size: 30px; }
+h2 { font-size: 22px; }
+p { color: #617089; line-height: 1.6; }
+
+.primaryButton {
+  border-color: #1f8f5b;
+  background: #28a86b;
+  color: #fff;
+}
+
+.dangerButton {
+  border-color: #f0b7b7;
+  color: #b42318;
+}
+
+.notice {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #c9d9ff;
+  background: #edf3ff;
+  border-radius: 8px;
+  color: #23447b;
+  white-space: pre-wrap;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.statCard, .practiceLauncher, .bankItem, .questionPanel, .empty {
+  border: 1px solid #e4e8f1;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(30 42 62 / 6%);
+}
+
+.statCard { padding: 18px; }
+.statCard span { display: block; color: #617089; margin-bottom: 8px; }
+.statCard strong { font-size: 28px; }
+
+.practiceLauncher { padding: 22px; }
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modeGrid.compact { max-width: 620px; }
+.bankList { display: grid; gap: 12px; }
+
+.bankItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.bankItem span {
+  display: block;
+  margin-top: 6px;
+  color: #617089;
+}
+
+.bankActions { display: flex; gap: 10px; }
+.questionPanel { padding: 26px; }
+
+.questionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.questionMeta span {
+  border: 1px solid #d9dfeb;
+  background: #f7f8fb;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #617089;
+  font-size: 13px;
+}
+
+.optionsList {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.optionButton {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+}
+
+.optionButton.selected {
+  border-color: #28a86b;
+  background: #eefaf3;
+}
+
+.answerBox {
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.answerBox p { margin-bottom: 0; }
+.answerBox.correct { border: 1px solid #8dd6ad; background: #effaf3; }
+.answerBox.wrong { border: 1px solid #f0b7b7; background: #fff1f1; }
+.questionActions { display: flex; flex-wrap: wrap; gap: 10px; }
+.practiceHeaderActions { display: flex; align-items: center; gap: 10px; }
+.empty { padding: 28px; color: #617089; }
+
+@media (max-width: 900px) {
+  .appShell { grid-template-columns: 1fr; }
+  .sidebar { display: flex; align-items: center; gap: 10px; padding: 14px; }
+  .brand { margin-bottom: 0; }
+  .nav { width: auto; margin-bottom: 0; }
+  .content { padding: 20px; }
+  .pageHeader, .bankItem, .practiceHeaderActions { align-items: stretch; flex-direction: column; }
+  .statsGrid, .modeGrid { grid-template-columns: 1fr 1fr; }
+}
