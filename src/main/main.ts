@@ -15,12 +15,15 @@ import {
 } from "./database.js";
 import { importJsonlFile } from "./importer.js";
 
+const windowIcon = app.isPackaged ? undefined : path.join(__dirname, "../../build/icon.ico");
+
 async function createWindow() {
   const window = new BrowserWindow({
     width: 1200,
     height: 780,
     minWidth: 960,
     minHeight: 640,
+    icon: windowIcon,
     title: "题库刷题软件",
     backgroundColor: "#f7f8fb",
     webPreferences: {
