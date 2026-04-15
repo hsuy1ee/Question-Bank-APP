@@ -3,7 +3,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import initSqlJs, { Database, SqlJsStatic } from "sql.js";
-import type { DashboardStats, JsonlQuestion, PracticeQuestion, QuestionBank, QuestionType, SubmitAnswerResult } from "../shared/types.js";
+import type {
+  DashboardStats,
+  JsonlQuestion,
+  PracticeMode,
+  PracticeQuestion,
+  PracticeSessionRestore,
+  PracticeSessionSnapshot,
+  QuestionBank,
+  QuestionType,
+  SubmitAnswerResult
+} from "../shared/types.js";
 
 const nodeRequire = createRequire(__filename);
 type SqlParam = number | string | Uint8Array | null;
@@ -74,6 +84,16 @@ export async function initDatabase() {
       created_at TEXT NOT NULL,
       FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS practice_sessions (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      bank_id INTEGER NOT NULL,
+      mode TEXT NOT NULL,
+      question_ids_json TEXT NOT NULL,
+      current_index INTEGER NOT NULL,
+      answer_states_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
+    );
   `);
   persistDatabase();
 }
@@ -127,6 +147,7 @@ export function listQuestionBanks(): QuestionBank[] {
 }
 
 export function deleteQuestionBank(bankId: number) {
+  getDb().run("DELETE FROM practice_sessions WHERE bank_id = ?", [bankId]);
   getDb().run("DELETE FROM attempts WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)", [bankId]);
   getDb().run("DELETE FROM favorites WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)", [bankId]);
   getDb().run("DELETE FROM questions WHERE bank_id = ?", [bankId]);
@@ -163,6 +184,95 @@ export function getPracticeQuestions(bankId: number, mode: "sequential" | "rando
   }));
 }
 
+export function getPracticeQuestionsByIds(questionIds: number[]) {
+  if (questionIds.length === 0) return [];
+  const placeholders = questionIds.map(() => "?").join(", ");
+  const records = rows<{ id: number; externalId: string; bankId: number; type: QuestionType; question: string; optionsJson: string; explanation: string; tagsJson: string }>(
+    getDb().prepare(`
+      SELECT q.id, q.external_id as externalId, q.bank_id as bankId, q.type, q.question,
+             q.options_json as optionsJson, q.explanation, q.tags_json as tagsJson
+      FROM questions q
+      JOIN question_banks b ON b.id = q.bank_id
+      WHERE q.id IN (${placeholders})
+    `),
+    questionIds
+  );
+  const byId = new Map(records.map((record) => [record.id, record]));
+  return questionIds.flatMap<PracticeQuestion>((id) => {
+    const record = byId.get(id);
+    if (!record) return [];
+    return [{
+      id: record.id,
+      externalId: record.externalId,
+      bankId: record.bankId,
+      type: record.type,
+      question: record.question,
+      options: JSON.parse(record.optionsJson) as string[],
+      explanation: record.explanation,
+      tags: JSON.parse(record.tagsJson) as string[]
+    }];
+  });
+}
+
+export function savePracticeSession(session: PracticeSessionSnapshot) {
+  getDb().run(
+    `
+      INSERT OR REPLACE INTO practice_sessions
+      (id, bank_id, mode, question_ids_json, current_index, answer_states_json, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      session.bankId,
+      session.mode,
+      JSON.stringify(session.questionIds),
+      session.currentIndex,
+      JSON.stringify(session.answerStates),
+      now()
+    ]
+  );
+  persistDatabase();
+}
+
+export function getLastPracticeSession(): PracticeSessionRestore | null {
+  const record = rows<{
+    bankId: number;
+    mode: PracticeMode;
+    questionIdsJson: string;
+    currentIndex: number;
+    answerStatesJson: string;
+  }>(
+    getDb().prepare(`
+      SELECT bank_id as bankId, mode, question_ids_json as questionIdsJson,
+             current_index as currentIndex, answer_states_json as answerStatesJson
+      FROM practice_sessions
+      WHERE id = 1
+    `)
+  )[0];
+
+  if (!record) return null;
+
+  const questionIds = JSON.parse(record.questionIdsJson) as number[];
+  const questions = getPracticeQuestionsByIds(questionIds);
+  if (questions.length !== questionIds.length) {
+    clearPracticeSession();
+    return null;
+  }
+
+  return {
+    bankId: record.bankId,
+    mode: record.mode,
+    questionIds,
+    currentIndex: Math.min(record.currentIndex, Math.max(questions.length - 1, 0)),
+    answerStates: JSON.parse(record.answerStatesJson) as PracticeSessionRestore["answerStates"],
+    questions
+  };
+}
+
+export function clearPracticeSession() {
+  getDb().run("DELETE FROM practice_sessions WHERE id = 1");
+  persistDatabase();
+}
+
 export function submitAnswer(questionId: number, selectedAnswer: string[]): SubmitAnswerResult {
   const record = rows<{ answerJson: string; explanation: string }>(getDb().prepare("SELECT answer_json as answerJson, explanation FROM questions WHERE id = ?"), [questionId])[0];
   if (!record) throw new Error("题目不存在。");
@@ -185,13 +295,15 @@ export function listFavoriteIds() {
   return rows<{ questionId: number }>(getDb().prepare("SELECT question_id as questionId FROM favorites")).map((row) => row.questionId);
 }
 
-export function getDashboardStats(): DashboardStats {
+export function getDashboardStats(bankId?: number): DashboardStats {
+  const bankFilter = typeof bankId === "number" ? " AND q.bank_id = ?" : "";
+  const bankParams = typeof bankId === "number" ? [bankId] : [];
   const bankCount = scalar<number>("SELECT COUNT(*) FROM question_banks") ?? 0;
-  const questionCount = scalar<number>("SELECT COUNT(*) FROM questions q JOIN question_banks b ON b.id = q.bank_id") ?? 0;
-  const attemptedCount = scalar<number>("SELECT COUNT(DISTINCT a.question_id) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id") ?? 0;
-  const favoriteCount = scalar<number>("SELECT COUNT(*) FROM favorites f JOIN questions q ON q.id = f.question_id JOIN question_banks b ON b.id = q.bank_id") ?? 0;
-  const wrongCount = scalar<number>("SELECT COUNT(DISTINCT a.question_id) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE a.correct = 0") ?? 0;
-  const totalAttempts = scalar<number>("SELECT COUNT(*) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id") ?? 0;
-  const correctAttempts = scalar<number>("SELECT COUNT(*) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE a.correct = 1") ?? 0;
-  return { bankCount, questionCount, attemptedCount, favoriteCount, wrongCount, accuracy: totalAttempts === 0 ? 0 : Math.round((correctAttempts / totalAttempts) * 100) };
+  const questionCount = scalar<number>(`SELECT COUNT(*) FROM questions q JOIN question_banks b ON b.id = q.bank_id WHERE 1=1${bankFilter}`, bankParams) ?? 0;
+  const attemptedCount = scalar<number>(`SELECT COUNT(DISTINCT a.question_id) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE 1=1${bankFilter}`, bankParams) ?? 0;
+  const favoriteCount = scalar<number>(`SELECT COUNT(*) FROM favorites f JOIN questions q ON q.id = f.question_id JOIN question_banks b ON b.id = q.bank_id WHERE 1=1${bankFilter}`, bankParams) ?? 0;
+  const wrongCount = scalar<number>(`SELECT COUNT(DISTINCT a.question_id) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE a.correct = 0${bankFilter}`, bankParams) ?? 0;
+  const totalAttempts = scalar<number>(`SELECT COUNT(*) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE 1=1${bankFilter}`, bankParams) ?? 0;
+  const correctAttempts = scalar<number>(`SELECT COUNT(*) FROM attempts a JOIN questions q ON q.id = a.question_id JOIN question_banks b ON b.id = q.bank_id WHERE a.correct = 1${bankFilter}`, bankParams) ?? 0;
+  return { bankCount, questionCount, attemptedCount, favoriteCount, wrongCount, accuracy: totalAttempts === 0 ? 0 : Math.round((correctAttempts / totalAttempts) * 1000) / 10 };
 }

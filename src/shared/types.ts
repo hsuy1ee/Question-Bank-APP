@@ -46,6 +46,25 @@ export interface SubmitAnswerResult {
   explanation: string;
 }
 
+export type PracticeMode = "sequential" | "random" | "wrong" | "favorite";
+
+export interface PracticeAnswerState {
+  selectedAnswer: string[];
+  result: SubmitAnswerResult | null;
+}
+
+export interface PracticeSessionSnapshot {
+  bankId: number;
+  mode: PracticeMode;
+  questionIds: number[];
+  currentIndex: number;
+  answerStates: Record<number, PracticeAnswerState>;
+}
+
+export interface PracticeSessionRestore extends PracticeSessionSnapshot {
+  questions: PracticeQuestion[];
+}
+
 export interface DashboardStats {
   bankCount: number;
   questionCount: number;

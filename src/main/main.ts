@@ -1,6 +1,18 @@
 import { BrowserWindow, app, dialog, ipcMain } from "electron";
 import path from "node:path";
-import { deleteQuestionBank, getDashboardStats, getPracticeQuestions, initDatabase, listFavoriteIds, listQuestionBanks, setFavorite, submitAnswer } from "./database.js";
+import {
+  clearPracticeSession,
+  deleteQuestionBank,
+  getDashboardStats,
+  getLastPracticeSession,
+  getPracticeQuestions,
+  initDatabase,
+  listFavoriteIds,
+  listQuestionBanks,
+  savePracticeSession,
+  setFavorite,
+  submitAnswer
+} from "./database.js";
 import { importJsonlFile } from "./importer.js";
 
 async function createWindow() {
@@ -24,7 +36,7 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   await initDatabase();
-  ipcMain.handle("stats:get", () => getDashboardStats());
+  ipcMain.handle("stats:get", (_event, bankId?: number) => getDashboardStats(bankId));
   ipcMain.handle("banks:list", () => listQuestionBanks());
   ipcMain.handle("banks:import-jsonl", async () => {
     const result = await dialog.showOpenDialog({ title: "选择 JSONL 题库文件", filters: [{ name: "JSONL 题库", extensions: ["jsonl"] }], properties: ["openFile"] });
@@ -34,6 +46,9 @@ app.whenReady().then(async () => {
   ipcMain.handle("banks:delete", (_event, bankId: number) => deleteQuestionBank(bankId));
   ipcMain.handle("practice:list", (_event, bankId: number, mode: "sequential" | "random" | "wrong" | "favorite") => getPracticeQuestions(bankId, mode));
   ipcMain.handle("practice:submit", (_event, questionId: number, selectedAnswer: string[]) => submitAnswer(questionId, selectedAnswer));
+  ipcMain.handle("practice:save-session", (_event, session) => savePracticeSession(session));
+  ipcMain.handle("practice:get-last-session", () => getLastPracticeSession());
+  ipcMain.handle("practice:clear-session", () => clearPracticeSession());
   ipcMain.handle("favorites:set", (_event, questionId: number, favorite: boolean) => setFavorite(questionId, favorite));
   ipcMain.handle("favorites:list", () => listFavoriteIds());
 

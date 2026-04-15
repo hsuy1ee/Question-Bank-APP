@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DashboardStats, ImportResult, PracticeQuestion, QuestionBank, SubmitAnswerResult } from "../shared/types";
+import type {
+  DashboardStats,
+  ImportResult,
+  PracticeAnswerState,
+  PracticeMode,
+  PracticeQuestion,
+  PracticeSessionRestore,
+  QuestionBank,
+  SubmitAnswerResult
+} from "../shared/types";
 
 type Page = "home" | "banks" | "practice";
-type PracticeMode = "sequential" | "random" | "wrong" | "favorite";
 
 const modeLabels: Record<PracticeMode, string> = {
   sequential: "顺序练习",
@@ -38,6 +46,9 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string[]>([]);
   const [answerResult, setAnswerResult] = useState<SubmitAnswerResult | null>(null);
+  const [answerStates, setAnswerStates] = useState<Record<number, PracticeAnswerState>>({});
+  const [showOverview, setShowOverview] = useState(false);
+  const [lastSession, setLastSession] = useState<PracticeSessionRestore | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState("");
 
@@ -54,14 +65,37 @@ function App() {
     return api;
   }
 
-  async function refresh() {
+  async function refresh(preferredBankId?: number | null) {
     const desktopApi = requireDesktopApi();
     if (!desktopApi) return;
-    const [nextStats, nextBanks, nextFavorites] = await Promise.all([desktopApi.getStats(), desktopApi.listBanks(), desktopApi.listFavoriteIds()]);
-    setStats(nextStats);
+    const [nextBanks, nextFavorites, nextSession] = await Promise.all([desktopApi.listBanks(), desktopApi.listFavoriteIds(), desktopApi.getLastPracticeSession()]);
+    const targetBankId = preferredBankId === undefined ? selectedBankId ?? nextBanks[0]?.id ?? null : preferredBankId ?? nextBanks[0]?.id ?? null;
+    const nextStats = await desktopApi.getStats(targetBankId ?? undefined);
     setBanks(nextBanks);
     setFavoriteIds(new Set(nextFavorites));
-    if (!selectedBankId && nextBanks[0]) setSelectedBankId(nextBanks[0].id);
+    setLastSession(nextSession);
+    setStats(nextStats);
+    setSelectedBankId(targetBankId);
+  }
+
+  async function saveSession(nextIndex = currentIndex, nextAnswerStates = answerStates, nextQuestions = questions, nextMode = practiceMode, bankId = selectedBank?.id) {
+    const desktopApi = requireDesktopApi();
+    if (!desktopApi || !bankId || nextQuestions.length === 0) return;
+    await desktopApi.savePracticeSession({
+      bankId,
+      mode: nextMode,
+      questionIds: nextQuestions.map((question) => question.id),
+      currentIndex: nextIndex,
+      answerStates: nextAnswerStates
+    });
+    setLastSession({
+      bankId,
+      mode: nextMode,
+      questionIds: nextQuestions.map((question) => question.id),
+      currentIndex: nextIndex,
+      answerStates: nextAnswerStates,
+      questions: nextQuestions
+    });
   }
 
   useEffect(() => {
@@ -79,8 +113,8 @@ function App() {
     try {
       const result: ImportResult | null = await desktopApi.importJsonl();
       if (!result) return;
-      await refresh();
       setSelectedBankId(result.bankId);
+      await refresh(result.bankId);
       setMessage(`已导入 ${result.bankName}：${result.imported} 题，跳过 ${result.skipped} 行。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "导入失败。");
@@ -93,7 +127,9 @@ function App() {
     await desktopApi.deleteBank(bankId);
     setSelectedBankId(null);
     setQuestions([]);
-    await refresh();
+    setAnswerStates({});
+    setLastSession(null);
+    await refresh(null);
   }
 
   async function startPractice(mode: PracticeMode) {
@@ -109,8 +145,37 @@ function App() {
     setCurrentIndex(0);
     setSelectedAnswer([]);
     setAnswerResult(null);
+    setAnswerStates({});
+    setShowOverview(false);
     setMessage(nextQuestions.length === 0 ? `${modeLabels[mode]}暂无可用题目。` : "");
+    if (nextQuestions.length > 0) {
+      await saveSession(0, {}, nextQuestions, mode, selectedBank.id);
+    }
     setPage("practice");
+  }
+
+  async function continuePractice() {
+    const desktopApi = requireDesktopApi();
+    if (!desktopApi) return;
+    const session = await desktopApi.getLastPracticeSession();
+    if (!session) {
+      setMessage("没有可继续的练习。");
+      setLastSession(null);
+      return;
+    }
+    const safeIndex = Math.min(session.currentIndex, Math.max(session.questions.length - 1, 0));
+    const currentState = session.answerStates[session.questions[safeIndex]?.id];
+    setSelectedBankId(session.bankId);
+    setPracticeMode(session.mode);
+    setQuestions(session.questions);
+    setCurrentIndex(safeIndex);
+    setAnswerStates(session.answerStates);
+    setSelectedAnswer(currentState?.selectedAnswer ?? []);
+    setAnswerResult(currentState?.result ?? null);
+    setShowOverview(false);
+    setMessage("");
+    setPage("practice");
+    await refresh(session.bankId);
   }
 
   async function toggleAnswer(value: string) {
@@ -129,7 +194,17 @@ function App() {
     const answer = answerOverride ?? selectedAnswer;
     if (!currentQuestion || answer.length === 0) return;
     const result = await desktopApi.submitAnswer(currentQuestion.id, answer);
+    setSelectedAnswer(answer);
     setAnswerResult(result);
+    const nextStates = {
+      ...answerStates,
+      [currentQuestion.id]: {
+        selectedAnswer: answer,
+        result
+      }
+    };
+    setAnswerStates(nextStates);
+    await saveSession(currentIndex, nextStates);
     await refresh();
   }
 
@@ -144,9 +219,27 @@ function App() {
   function goQuestion(offset: number) {
     const nextIndex = currentIndex + offset;
     if (nextIndex < 0 || nextIndex >= questions.length) return;
+    const nextQuestion = questions[nextIndex];
+    const nextState = answerStates[nextQuestion.id];
     setCurrentIndex(nextIndex);
-    setSelectedAnswer([]);
-    setAnswerResult(null);
+    setSelectedAnswer(nextState?.selectedAnswer ?? []);
+    setAnswerResult(nextState?.result ?? null);
+    void saveSession(nextIndex);
+  }
+
+  function jumpToQuestion(index: number) {
+    const nextQuestion = questions[index];
+    const nextState = answerStates[nextQuestion.id];
+    setCurrentIndex(index);
+    setSelectedAnswer(nextState?.selectedAnswer ?? []);
+    setAnswerResult(nextState?.result ?? null);
+    setShowOverview(false);
+    void saveSession(index);
+  }
+
+  function handleBankChange(bankId: number) {
+    setSelectedBankId(bankId);
+    void refresh(bankId);
   }
 
   return (
@@ -171,16 +264,19 @@ function App() {
               <button className="primaryButton" onClick={handleImport}>导入 JSONL</button>
             </div>
             <div className="statsGrid">
-              <Stat label="题库" value={stats?.bankCount ?? 0} />
               <Stat label="总题数" value={stats?.questionCount ?? 0} />
               <Stat label="已练题" value={stats?.attemptedCount ?? 0} />
-              <Stat label="正确率" value={`${stats?.accuracy ?? 0}%`} />
+              <Stat label="正确率" value={`${(stats?.accuracy ?? 0).toFixed(1)}%`} />
               <Stat label="错题" value={stats?.wrongCount ?? 0} />
               <Stat label="收藏" value={stats?.favoriteCount ?? 0} />
             </div>
             <div className="practiceLauncher">
               <h2>开始练习</h2>
-              <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={setSelectedBankId} />
+              <p className="selectedBankName">当前题库：{selectedBank?.name ?? "未选择题库"}</p>
+              <div className="practicePicker">
+                <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={handleBankChange} />
+                <button className="primaryButton" onClick={() => void continuePractice()} disabled={!lastSession}>继续做题</button>
+              </div>
               <div className="modeGrid">
                 {(Object.keys(modeLabels) as PracticeMode[]).map((mode) => <button key={mode} onClick={() => void startPractice(mode)}>{modeLabels[mode]}</button>)}
               </div>
@@ -215,7 +311,7 @@ function App() {
               <div><h1>{modeLabels[practiceMode]}</h1><p>{selectedBank ? selectedBank.name : "未选择题库"}</p></div>
               <div className="practiceHeaderActions">
                 <button onClick={() => setPage("home")}>返回</button>
-                <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={setSelectedBankId} />
+                <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={handleBankChange} />
               </div>
             </div>
             {currentQuestion ? (
@@ -229,8 +325,16 @@ function App() {
                 <div className="optionsList">
                   {(currentQuestion.type === "judge" ? ["正确", "错误"] : currentQuestion.options).map((option, index) => {
                     const value = currentQuestion.type === "judge" ? (index === 0 ? "true" : "false") : optionLetter(index);
+                    const isSelected = selectedAnswer.includes(value);
+                    const isCorrectOption = Boolean(answerResult?.correctAnswer.includes(value));
+                    const optionClass = [
+                      "optionButton",
+                      isSelected ? "selected" : "",
+                      answerResult && isCorrectOption ? "correctOption" : "",
+                      answerResult && isSelected && !isCorrectOption ? "wrongOption" : ""
+                    ].filter(Boolean).join(" ");
                     return (
-                      <button key={value} className={selectedAnswer.includes(value) ? "optionButton selected" : "optionButton"} onClick={() => void toggleAnswer(value)}>
+                      <button key={value} className={optionClass} onClick={() => void toggleAnswer(value)}>
                         <strong>{currentQuestion.type === "judge" ? "" : `${value}.`}</strong><span>{option}</span>
                       </button>
                     );
@@ -249,11 +353,30 @@ function App() {
                 <div className="questionActions">
                   <button onClick={() => goQuestion(-1)} disabled={currentIndex === 0}>上一题</button>
                   <button onClick={toggleFavorite}>{favoriteIds.has(currentQuestion.id) ? "取消收藏" : "收藏"}</button>
+                  <button onClick={() => setShowOverview((value) => !value)}>总览</button>
                   {currentQuestion.type === "multiple" && (
                     <button className="primaryButton" onClick={() => void submitCurrentAnswer()} disabled={selectedAnswer.length === 0 || Boolean(answerResult)}>提交答案</button>
                   )}
                   <button onClick={() => goQuestion(1)} disabled={currentIndex >= questions.length - 1}>下一题</button>
                 </div>
+                {showOverview && (
+                  <div className="overviewPanel">
+                    {questions.map((question, index) => {
+                      const state = answerStates[question.id];
+                      const className = [
+                        "overviewButton",
+                        index === currentIndex ? "current" : "",
+                        state?.result?.correct ? "answeredCorrect" : "",
+                        state?.result && !state.result.correct ? "answeredWrong" : ""
+                      ].filter(Boolean).join(" ");
+                      return (
+                        <button className={className} key={question.id} onClick={() => jumpToQuestion(index)}>
+                          {index + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="empty">

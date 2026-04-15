@@ -130,9 +130,33 @@ p { color: #617089; line-height: 1.6; }
 
 .statCard { padding: 18px; }
 .statCard span { display: block; color: #617089; margin-bottom: 8px; }
-.statCard strong { font-size: 28px; }
+.statCard strong {
+  display: block;
+  min-width: 0;
+  font-size: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .practiceLauncher { padding: 22px; }
+
+.selectedBankName {
+  margin-bottom: 14px;
+  color: #1d2433;
+  font-weight: 600;
+}
+
+.practicePicker {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 160px;
+  gap: 12px;
+  align-items: center;
+}
+
+.practicePicker select {
+  width: 100%;
+}
 
 .modeGrid {
   display: grid;
@@ -196,6 +220,16 @@ p { color: #617089; line-height: 1.6; }
   background: #eefaf3;
 }
 
+.optionButton.correctOption {
+  border-color: #28a86b;
+  background: #eefaf3;
+}
+
+.optionButton.wrongOption {
+  border-color: #dc4c4c;
+  background: #fff1f1;
+}
+
 .answerBox {
   border-radius: 8px;
   padding: 16px;
@@ -203,10 +237,41 @@ p { color: #617089; line-height: 1.6; }
 }
 
 .answerBox p { margin-bottom: 0; }
-.answerBox.correct { border: 1px solid #8dd6ad; background: #effaf3; }
-.answerBox.wrong { border: 1px solid #f0b7b7; background: #fff1f1; }
+.answerBox.correct,
+.answerBox.wrong {
+  border: 1px solid #9dbcf7;
+  background: #edf3ff;
+}
 .questionActions { display: flex; flex-wrap: wrap; gap: 10px; }
 .practiceHeaderActions { display: flex; align-items: center; gap: 10px; }
+.overviewPanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e8f1;
+}
+
+.overviewButton {
+  min-height: 42px;
+  padding: 8px;
+}
+
+.overviewButton.current {
+  border-color: #2f6fed;
+  background: #edf3ff;
+}
+
+.overviewButton.answeredCorrect {
+  border-color: #28a86b;
+  background: #eefaf3;
+}
+
+.overviewButton.answeredWrong {
+  border-color: #dc4c4c;
+  background: #fff1f1;
+}
 .empty { padding: 28px; color: #617089; }
 
 @media (max-width: 900px) {
@@ -217,4 +282,5 @@ p { color: #617089; line-height: 1.6; }
   .content { padding: 20px; }
   .pageHeader, .bankItem, .practiceHeaderActions { align-items: stretch; flex-direction: column; }
   .statsGrid, .modeGrid { grid-template-columns: 1fr 1fr; }
+  .practicePicker { grid-template-columns: 1fr; }
 }
