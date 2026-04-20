@@ -10,6 +10,7 @@ const api = {
   submitAnswer: (questionId: number, selectedAnswer: string[]) => ipcRenderer.invoke("practice:submit", questionId, selectedAnswer) as Promise<SubmitAnswerResult>,
   savePracticeSession: (session: PracticeSessionSnapshot) => ipcRenderer.invoke("practice:save-session", session) as Promise<void>,
   getLastPracticeSession: () => ipcRenderer.invoke("practice:get-last-session") as Promise<PracticeSessionRestore | null>,
+  clearPracticeHistory: (bankId: number) => ipcRenderer.invoke("practice:clear-history", bankId) as Promise<void>,
   clearPracticeSession: () => ipcRenderer.invoke("practice:clear-session") as Promise<void>,
   setFavorite: (questionId: number, favorite: boolean) => ipcRenderer.invoke("favorites:set", questionId, favorite) as Promise<void>,
   listFavoriteIds: () => ipcRenderer.invoke("favorites:list") as Promise<number[]>

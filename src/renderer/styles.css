@@ -104,6 +104,12 @@ p { color: #617089; line-height: 1.6; }
   color: #b42318;
 }
 
+.dangerSolidButton {
+  border-color: #d92d20;
+  background: #d92d20;
+  color: #fff;
+}
+
 .notice {
   margin-bottom: 18px;
   padding: 12px 14px;
@@ -149,7 +155,7 @@ p { color: #617089; line-height: 1.6; }
 
 .practicePicker {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) 160px;
+  grid-template-columns: minmax(280px, 1fr) 160px 160px;
   gap: 12px;
   align-items: center;
 }
@@ -225,6 +231,11 @@ p { color: #617089; line-height: 1.6; }
   background: #eefaf3;
 }
 
+.optionButton.missedCorrectOption {
+  border-color: #e2b93b;
+  background: #fff8db;
+}
+
 .optionButton.wrongOption {
   border-color: #dc4c4c;
   background: #fff1f1;
@@ -243,6 +254,30 @@ p { color: #617089; line-height: 1.6; }
   background: #edf3ff;
 }
 .questionActions { display: flex; flex-wrap: wrap; gap: 10px; }
+.favoriteActionButton {
+  display: inline-grid;
+  place-items: center;
+  min-width: 58px;
+  padding: 10px 14px;
+  transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.favoriteActionButton:hover {
+  background: #f8fafc;
+}
+
+.favoriteActionButton.active {
+  border-color: #f3c56b;
+  background: #fff7e8;
+  box-shadow: 0 4px 12px rgb(245 158 11 / 10%);
+}
+
+.favoriteActionIcon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
 .practiceHeaderActions { display: flex; align-items: center; gap: 10px; }
 .overviewPanel {
   display: grid;
@@ -254,8 +289,20 @@ p { color: #617089; line-height: 1.6; }
 }
 
 .overviewButton {
+  position: relative;
   min-height: 42px;
   padding: 8px;
+  overflow: visible;
+}
+
+.favoriteBadge {
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  transform: rotate(16deg);
+  filter: drop-shadow(0 2px 4px rgb(224 161 0 / 0.18));
 }
 
 .overviewButton.current {
@@ -272,6 +319,59 @@ p { color: #617089; line-height: 1.6; }
   border-color: #dc4c4c;
   background: #fff1f1;
 }
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(24 34 53 / 28%);
+  backdrop-filter: blur(2px);
+}
+
+.dialogCard {
+  width: min(480px, 100%);
+  border: 1px solid #e4e8f1;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 56px rgb(30 42 62 / 20%);
+  padding: 24px;
+}
+
+.dialogIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+  background: #fff2f0;
+  color: #d92d20;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.dialogContent h3 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.dialogContent p {
+  margin: 0 0 10px;
+}
+
+.dialogContent p:last-child {
+  margin-bottom: 0;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
 .empty { padding: 28px; color: #617089; }
 
 @media (max-width: 900px) {

@@ -36,6 +36,35 @@ function formatCorrectAnswer(question: PracticeQuestion, answer: string[]) {
   return answer.join("、");
 }
 
+function FavoriteIcon({
+  favorited,
+  className = "",
+  filled = favorited
+}: {
+  favorited: boolean;
+  className?: string;
+  filled?: boolean;
+}) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <polygon
+        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+        stroke={favorited ? "#F59E0B" : "#94A3B8"}
+        strokeWidth={favorited ? "1.5" : "2"}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={filled && favorited ? "#F59E0B" : "none"}
+      />
+    </svg>
+  );
+}
+
 function App() {
   const [page, setPage] = useState<Page>("home");
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -51,6 +80,7 @@ function App() {
   const [lastSession, setLastSession] = useState<PracticeSessionRestore | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState("");
+  const [showClearHistoryDialog, setShowClearHistoryDialog] = useState(false);
 
   const currentQuestion = questions[currentIndex];
   const visibleTags = currentQuestion ? currentQuestion.tags.filter((tag) => tag !== questionTypeLabels[currentQuestion.type]) : [];
@@ -130,6 +160,30 @@ function App() {
     setAnswerStates({});
     setLastSession(null);
     await refresh(null);
+  }
+
+  function promptClearPracticeHistory() {
+    if (!selectedBank) return;
+    setShowClearHistoryDialog(true);
+  }
+
+  async function handleClearPracticeHistory() {
+    const desktopApi = requireDesktopApi();
+    if (!desktopApi || !selectedBank) return;
+
+    await desktopApi.clearPracticeHistory(selectedBank.id);
+    setShowClearHistoryDialog(false);
+    if (lastSession?.bankId === selectedBank.id) {
+      setLastSession(null);
+    }
+    setQuestions([]);
+    setCurrentIndex(0);
+    setSelectedAnswer([]);
+    setAnswerResult(null);
+    setAnswerStates({});
+    setShowOverview(false);
+    setMessage(`已清空 ${selectedBank.name} 的做题记录。`);
+    await refresh(selectedBank.id);
   }
 
   async function startPractice(mode: PracticeMode) {
@@ -276,6 +330,7 @@ function App() {
               <div className="practicePicker">
                 <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={handleBankChange} />
                 <button className="primaryButton" onClick={() => void continuePractice()} disabled={!lastSession}>继续做题</button>
+                <button className="dangerButton" onClick={promptClearPracticeHistory} disabled={!selectedBank}>清空记录</button>
               </div>
               <div className="modeGrid">
                 {(Object.keys(modeLabels) as PracticeMode[]).map((mode) => <button key={mode} onClick={() => void startPractice(mode)}>{modeLabels[mode]}</button>)}
@@ -295,7 +350,7 @@ function App() {
                 <article className="bankItem" key={bank.id}>
                   <div><strong>{bank.name}</strong><span>{bank.questionCount} 题 · {new Date(bank.createdAt).toLocaleString()}</span></div>
                   <div className="bankActions">
-                    <button onClick={() => setSelectedBankId(bank.id)}>选择</button>
+                    <button onClick={() => handleBankChange(bank.id)}>选择</button>
                     <button className="dangerButton" onClick={() => void handleDeleteBank(bank.id)}>删除</button>
                   </div>
                 </article>
@@ -327,11 +382,15 @@ function App() {
                     const value = currentQuestion.type === "judge" ? (index === 0 ? "true" : "false") : optionLetter(index);
                     const isSelected = selectedAnswer.includes(value);
                     const isCorrectOption = Boolean(answerResult?.correctAnswer.includes(value));
+                    const isSelectedCorrect = Boolean(answerResult && isSelected && isCorrectOption);
+                    const isMissedCorrect = Boolean(answerResult && !isSelected && isCorrectOption);
+                    const isSelectedWrong = Boolean(answerResult && isSelected && !isCorrectOption);
                     const optionClass = [
                       "optionButton",
-                      isSelected ? "selected" : "",
-                      answerResult && isCorrectOption ? "correctOption" : "",
-                      answerResult && isSelected && !isCorrectOption ? "wrongOption" : ""
+                      isSelected && !answerResult ? "selected" : "",
+                      isSelectedCorrect ? "correctOption" : "",
+                      isMissedCorrect ? "missedCorrectOption" : "",
+                      isSelectedWrong ? "wrongOption" : ""
                     ].filter(Boolean).join(" ");
                     return (
                       <button key={value} className={optionClass} onClick={() => void toggleAnswer(value)}>
@@ -352,17 +411,29 @@ function App() {
                 )}
                 <div className="questionActions">
                   <button onClick={() => goQuestion(-1)} disabled={currentIndex === 0}>上一题</button>
-                  <button onClick={toggleFavorite}>{favoriteIds.has(currentQuestion.id) ? "取消收藏" : "收藏"}</button>
                   <button onClick={() => setShowOverview((value) => !value)}>总览</button>
                   {currentQuestion.type === "multiple" && (
                     <button className="primaryButton" onClick={() => void submitCurrentAnswer()} disabled={selectedAnswer.length === 0 || Boolean(answerResult)}>提交答案</button>
                   )}
                   <button onClick={() => goQuestion(1)} disabled={currentIndex >= questions.length - 1}>下一题</button>
+                  <button
+                    className={favoriteIds.has(currentQuestion.id) ? "favoriteActionButton active" : "favoriteActionButton"}
+                    onClick={toggleFavorite}
+                    aria-label={favoriteIds.has(currentQuestion.id) ? "取消收藏" : "收藏"}
+                    title={favoriteIds.has(currentQuestion.id) ? "取消收藏" : "收藏"}
+                  >
+                    <FavoriteIcon
+                      favorited={favoriteIds.has(currentQuestion.id)}
+                      filled={favoriteIds.has(currentQuestion.id)}
+                      className="favoriteActionIcon"
+                    />
+                  </button>
                 </div>
                 {showOverview && (
                   <div className="overviewPanel">
                     {questions.map((question, index) => {
                       const state = answerStates[question.id];
+                      const isFavorite = favoriteIds.has(question.id);
                       const className = [
                         "overviewButton",
                         index === currentIndex ? "current" : "",
@@ -371,7 +442,8 @@ function App() {
                       ].filter(Boolean).join(" ");
                       return (
                         <button className={className} key={question.id} onClick={() => jumpToQuestion(index)}>
-                          {index + 1}
+                          <span>{index + 1}</span>
+                          {isFavorite && <FavoriteIcon favorited filled={false} className="favoriteBadge" />}
                         </button>
                       );
                     })}
@@ -389,6 +461,23 @@ function App() {
           </section>
         )}
       </main>
+
+      {showClearHistoryDialog && selectedBank && (
+        <div className="dialogOverlay" onClick={() => setShowClearHistoryDialog(false)}>
+          <div className="dialogCard" onClick={(event) => event.stopPropagation()}>
+            <div className="dialogIcon" aria-hidden="true">!</div>
+            <div className="dialogContent">
+              <h3>清空做题记录</h3>
+              <p>确认清空题库“{selectedBank.name}”的做题记录吗？</p>
+              <p>这会重置已练题、正确率、错题等统计，但不会删除题目和收藏。</p>
+            </div>
+            <div className="dialogActions">
+              <button onClick={() => setShowClearHistoryDialog(false)}>取消</button>
+              <button className="dangerSolidButton" onClick={() => void handleClearPracticeHistory()}>确认清空</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

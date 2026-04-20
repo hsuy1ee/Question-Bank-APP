@@ -1,6 +1,7 @@
 import { BrowserWindow, app, dialog, ipcMain } from "electron";
 import path from "node:path";
 import {
+  clearPracticeHistory,
   clearPracticeSession,
   deleteQuestionBank,
   getDashboardStats,
@@ -16,6 +17,9 @@ import {
 import { importJsonlFile } from "./importer.js";
 
 const windowIcon = app.isPackaged ? undefined : path.join(__dirname, "../../build/icon.ico");
+const appUserModelId = "com.xsy.questionbank";
+
+app.setAppUserModelId(appUserModelId);
 
 async function createWindow() {
   const window = new BrowserWindow({
@@ -47,6 +51,7 @@ app.whenReady().then(async () => {
     return importJsonlFile(result.filePaths[0]);
   });
   ipcMain.handle("banks:delete", (_event, bankId: number) => deleteQuestionBank(bankId));
+  ipcMain.handle("practice:clear-history", (_event, bankId: number) => clearPracticeHistory(bankId));
   ipcMain.handle("practice:list", (_event, bankId: number, mode: "sequential" | "random" | "wrong" | "favorite") => getPracticeQuestions(bankId, mode));
   ipcMain.handle("practice:submit", (_event, questionId: number, selectedAnswer: string[]) => submitAnswer(questionId, selectedAnswer));
   ipcMain.handle("practice:save-session", (_event, session) => savePracticeSession(session));

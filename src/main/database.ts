@@ -155,6 +155,12 @@ export function deleteQuestionBank(bankId: number) {
   persistDatabase();
 }
 
+export function clearPracticeHistory(bankId: number) {
+  getDb().run("DELETE FROM practice_sessions WHERE bank_id = ?", [bankId]);
+  getDb().run("DELETE FROM attempts WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)", [bankId]);
+  persistDatabase();
+}
+
 export function getPracticeQuestions(bankId: number, mode: "sequential" | "random" | "wrong" | "favorite") {
   const orderClause = mode === "random" ? "ORDER BY random()" : "ORDER BY q.id ASC";
   const whereParts = ["q.bank_id = ?"];
