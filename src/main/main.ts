@@ -55,8 +55,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("practice:list", (_event, bankId: number, mode: "sequential" | "random" | "wrong" | "favorite") => getPracticeQuestions(bankId, mode));
   ipcMain.handle("practice:submit", (_event, questionId: number, selectedAnswer: string[]) => submitAnswer(questionId, selectedAnswer));
   ipcMain.handle("practice:save-session", (_event, session) => savePracticeSession(session));
-  ipcMain.handle("practice:get-last-session", () => getLastPracticeSession());
-  ipcMain.handle("practice:clear-session", () => clearPracticeSession());
+  ipcMain.handle("practice:get-last-session", (_event, bankId?: number) => getLastPracticeSession(bankId));
+  ipcMain.handle("practice:clear-session", (_event, bankId?: number) => clearPracticeSession(bankId));
   ipcMain.handle("favorites:set", (_event, questionId: number, favorite: boolean) => setFavorite(questionId, favorite));
   ipcMain.handle("favorites:list", () => listFavoriteIds());
 

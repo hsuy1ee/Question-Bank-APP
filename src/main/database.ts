@@ -85,8 +85,7 @@ export async function initDatabase() {
       FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS practice_sessions (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      bank_id INTEGER NOT NULL,
+      bank_id INTEGER PRIMARY KEY,
       mode TEXT NOT NULL,
       question_ids_json TEXT NOT NULL,
       current_index INTEGER NOT NULL,
@@ -95,7 +94,44 @@ export async function initDatabase() {
       FOREIGN KEY(bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
     );
   `);
+  migratePracticeSessions();
   persistDatabase();
+}
+
+function migratePracticeSessions() {
+  const columns = rows<{ name: string }>(getDb().prepare("PRAGMA table_info(practice_sessions)"));
+  if (!columns.some((column) => column.name === "id")) return;
+
+  const database = getDb();
+  database.run("PRAGMA foreign_keys = OFF");
+  database.run("BEGIN TRANSACTION");
+  try {
+    database.run(`
+      CREATE TABLE practice_sessions_next (
+        bank_id INTEGER PRIMARY KEY,
+        mode TEXT NOT NULL,
+        question_ids_json TEXT NOT NULL,
+        current_index INTEGER NOT NULL,
+        answer_states_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
+      )
+    `);
+    database.run(`
+      INSERT OR REPLACE INTO practice_sessions_next
+      (bank_id, mode, question_ids_json, current_index, answer_states_json, updated_at)
+      SELECT bank_id, mode, question_ids_json, current_index, answer_states_json, updated_at
+      FROM practice_sessions
+    `);
+    database.run("DROP TABLE practice_sessions");
+    database.run("ALTER TABLE practice_sessions_next RENAME TO practice_sessions");
+    database.run("COMMIT");
+  } catch (error) {
+    database.run("ROLLBACK");
+    throw error;
+  } finally {
+    database.run("PRAGMA foreign_keys = ON");
+  }
 }
 
 export function persistDatabase() {
@@ -224,8 +260,8 @@ export function savePracticeSession(session: PracticeSessionSnapshot) {
   getDb().run(
     `
       INSERT OR REPLACE INTO practice_sessions
-      (id, bank_id, mode, question_ids_json, current_index, answer_states_json, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?)
+      (bank_id, mode, question_ids_json, current_index, answer_states_json, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
     `,
     [
       session.bankId,
@@ -239,7 +275,7 @@ export function savePracticeSession(session: PracticeSessionSnapshot) {
   persistDatabase();
 }
 
-export function getLastPracticeSession(): PracticeSessionRestore | null {
+export function getLastPracticeSession(bankId?: number): PracticeSessionRestore | null {
   const record = rows<{
     bankId: number;
     mode: PracticeMode;
@@ -251,8 +287,9 @@ export function getLastPracticeSession(): PracticeSessionRestore | null {
       SELECT bank_id as bankId, mode, question_ids_json as questionIdsJson,
              current_index as currentIndex, answer_states_json as answerStatesJson
       FROM practice_sessions
-      WHERE id = 1
-    `)
+      ${bankId === undefined ? "ORDER BY updated_at DESC LIMIT 1" : "WHERE bank_id = ?"}
+    `),
+    bankId === undefined ? [] : [bankId]
   )[0];
 
   if (!record) return null;
@@ -260,7 +297,7 @@ export function getLastPracticeSession(): PracticeSessionRestore | null {
   const questionIds = JSON.parse(record.questionIdsJson) as number[];
   const questions = getPracticeQuestionsByIds(questionIds);
   if (questions.length !== questionIds.length) {
-    clearPracticeSession();
+    clearPracticeSession(record.bankId);
     return null;
   }
 
@@ -274,8 +311,9 @@ export function getLastPracticeSession(): PracticeSessionRestore | null {
   };
 }
 
-export function clearPracticeSession() {
-  getDb().run("DELETE FROM practice_sessions WHERE id = 1");
+export function clearPracticeSession(bankId?: number) {
+  if (bankId === undefined) getDb().run("DELETE FROM practice_sessions");
+  else getDb().run("DELETE FROM practice_sessions WHERE bank_id = ?", [bankId]);
   persistDatabase();
 }
 

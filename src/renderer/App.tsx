@@ -98,9 +98,12 @@ function App() {
   async function refresh(preferredBankId?: number | null) {
     const desktopApi = requireDesktopApi();
     if (!desktopApi) return;
-    const [nextBanks, nextFavorites, nextSession] = await Promise.all([desktopApi.listBanks(), desktopApi.listFavoriteIds(), desktopApi.getLastPracticeSession()]);
+    const [nextBanks, nextFavorites] = await Promise.all([desktopApi.listBanks(), desktopApi.listFavoriteIds()]);
     const targetBankId = preferredBankId === undefined ? selectedBankId ?? nextBanks[0]?.id ?? null : preferredBankId ?? nextBanks[0]?.id ?? null;
-    const nextStats = await desktopApi.getStats(targetBankId ?? undefined);
+    const [nextStats, nextSession] = await Promise.all([
+      desktopApi.getStats(targetBankId ?? undefined),
+      targetBankId ? desktopApi.getLastPracticeSession(targetBankId) : Promise.resolve(null)
+    ]);
     setBanks(nextBanks);
     setFavoriteIds(new Set(nextFavorites));
     setLastSession(nextSession);
@@ -211,9 +214,13 @@ function App() {
   async function continuePractice() {
     const desktopApi = requireDesktopApi();
     if (!desktopApi) return;
-    const session = await desktopApi.getLastPracticeSession();
+    if (!selectedBank) {
+      setMessage("请先选择题库。");
+      return;
+    }
+    const session = await desktopApi.getLastPracticeSession(selectedBank.id);
     if (!session) {
-      setMessage("没有可继续的练习。");
+      setMessage(`${selectedBank.name} 没有可继续的练习。`);
       setLastSession(null);
       return;
     }
@@ -329,7 +336,7 @@ function App() {
               <p className="selectedBankName">当前题库：{selectedBank?.name ?? "未选择题库"}</p>
               <div className="practicePicker">
                 <BankSelect banks={banks} selectedBankId={selectedBank?.id ?? null} onChange={handleBankChange} />
-                <button className="primaryButton" onClick={() => void continuePractice()} disabled={!lastSession}>继续做题</button>
+                <button className="primaryButton" onClick={() => void continuePractice()} disabled={!selectedBank || !lastSession}>继续做题</button>
                 <button className="dangerButton" onClick={promptClearPracticeHistory} disabled={!selectedBank}>清空记录</button>
               </div>
               <div className="modeGrid">
@@ -382,8 +389,8 @@ function App() {
                     const value = currentQuestion.type === "judge" ? (index === 0 ? "true" : "false") : optionLetter(index);
                     const isSelected = selectedAnswer.includes(value);
                     const isCorrectOption = Boolean(answerResult?.correctAnswer.includes(value));
-                    const isSelectedCorrect = Boolean(answerResult && isSelected && isCorrectOption);
-                    const isMissedCorrect = Boolean(answerResult && !isSelected && isCorrectOption);
+                    const isMissedCorrect = Boolean(answerResult && currentQuestion.type === "multiple" && !isSelected && isCorrectOption);
+                    const isSelectedCorrect = Boolean(answerResult && isCorrectOption && !isMissedCorrect);
                     const isSelectedWrong = Boolean(answerResult && isSelected && !isCorrectOption);
                     const optionClass = [
                       "optionButton",
