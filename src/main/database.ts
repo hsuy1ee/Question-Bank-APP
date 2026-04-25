@@ -198,7 +198,14 @@ export function clearPracticeHistory(bankId: number) {
 }
 
 export function getPracticeQuestions(bankId: number, mode: "sequential" | "random" | "wrong" | "favorite") {
-  const orderClause = mode === "random" ? "ORDER BY random()" : "ORDER BY q.id ASC";
+  const orderClause = mode === "random"
+    ? "ORDER BY random()"
+    : `ORDER BY CASE q.type
+        WHEN 'single' THEN 1
+        WHEN 'multiple' THEN 2
+        WHEN 'judge' THEN 3
+        ELSE 99
+      END, q.id ASC`;
   const whereParts = ["q.bank_id = ?"];
   if (mode === "wrong") whereParts.push("EXISTS (SELECT 1 FROM attempts a WHERE a.question_id = q.id AND a.correct = 0)");
   if (mode === "favorite") whereParts.push("EXISTS (SELECT 1 FROM favorites f WHERE f.question_id = q.id)");

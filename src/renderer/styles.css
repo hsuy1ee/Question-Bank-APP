@@ -281,11 +281,27 @@ p { color: #617089; line-height: 1.6; }
 .practiceHeaderActions { display: flex; align-items: center; gap: 10px; }
 .overviewPanel {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: 8px;
+  gap: 14px;
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #e4e8f1;
+}
+
+.overviewSection {
+  display: grid;
+  gap: 8px;
+}
+
+.overviewTypeHeading {
+  margin: 0;
+  font-size: 16px;
+  color: #36435b;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 8px;
 }
 
 .overviewButton {

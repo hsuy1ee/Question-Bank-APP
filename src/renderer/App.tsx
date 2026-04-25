@@ -85,6 +85,22 @@ function App() {
   const currentQuestion = questions[currentIndex];
   const visibleTags = currentQuestion ? currentQuestion.tags.filter((tag) => tag !== questionTypeLabels[currentQuestion.type]) : [];
   const selectedBank = useMemo(() => banks.find((bank) => bank.id === selectedBankId) ?? banks[0], [banks, selectedBankId]);
+  const currentTypeProgress = useMemo(() => {
+    if (!currentQuestion) return null;
+    const sameTypeQuestions = questions.filter((question) => question.type === currentQuestion.type);
+    const position = sameTypeQuestions.findIndex((question) => question.id === currentQuestion.id);
+    if (position < 0) return null;
+    return { current: position + 1, total: sameTypeQuestions.length };
+  }, [questions, currentQuestion]);
+  const overviewSections = useMemo(() => {
+    const orderedTypes: PracticeQuestion["type"][] = ["single", "multiple", "judge"];
+    return orderedTypes
+      .map((type) => ({
+        type,
+        items: questions.flatMap((question, index) => (question.type === type ? [{ question, index }] : []))
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [questions]);
   const api = window.quizApi;
 
   function requireDesktopApi() {
@@ -379,7 +395,7 @@ function App() {
             {currentQuestion ? (
               <div className="questionPanel">
                 <div className="questionMeta">
-                  <span>{currentIndex + 1} / {questions.length}</span>
+                  <span>{currentTypeProgress ? `${currentTypeProgress.current} / ${currentTypeProgress.total}` : `${currentIndex + 1} / ${questions.length}`}</span>
                   <span>{questionTypeLabels[currentQuestion.type]}</span>
                   {visibleTags.map((tag) => <span key={tag}>{tag}</span>)}
                 </div>
@@ -438,22 +454,29 @@ function App() {
                 </div>
                 {showOverview && (
                   <div className="overviewPanel">
-                    {questions.map((question, index) => {
-                      const state = answerStates[question.id];
-                      const isFavorite = favoriteIds.has(question.id);
-                      const className = [
-                        "overviewButton",
-                        index === currentIndex ? "current" : "",
-                        state?.result?.correct ? "answeredCorrect" : "",
-                        state?.result && !state.result.correct ? "answeredWrong" : ""
-                      ].filter(Boolean).join(" ");
-                      return (
-                        <button className={className} key={question.id} onClick={() => jumpToQuestion(index)}>
-                          <span>{index + 1}</span>
-                          {isFavorite && <FavoriteIcon favorited filled={false} className="favoriteBadge" />}
-                        </button>
-                      );
-                    })}
+                    {overviewSections.map((section) => (
+                      <div className="overviewSection" key={section.type}>
+                        <h3 className="overviewTypeHeading">{questionTypeLabels[section.type]}</h3>
+                        <div className="overviewGrid">
+                          {section.items.map(({ question, index }, sectionIndex) => {
+                            const state = answerStates[question.id];
+                            const isFavorite = favoriteIds.has(question.id);
+                            const className = [
+                              "overviewButton",
+                              index === currentIndex ? "current" : "",
+                              state?.result?.correct ? "answeredCorrect" : "",
+                              state?.result && !state.result.correct ? "answeredWrong" : ""
+                            ].filter(Boolean).join(" ");
+                            return (
+                              <button className={className} key={question.id} onClick={() => jumpToQuestion(index)}>
+                                <span>{sectionIndex + 1}</span>
+                                {isFavorite && <FavoriteIcon favorited filled={false} className="favoriteBadge" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
