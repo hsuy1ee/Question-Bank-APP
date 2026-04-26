@@ -425,11 +425,7 @@ function App() {
                 {answerResult && (
                   <div className={answerResult.correct ? "answerBox correct" : "answerBox wrong"}>
                     <strong>{answerResult.correct ? "回答正确" : "回答错误"}</strong>
-                    {currentQuestion.type === "judge" ? (
-                      <p>正确答案：{formatCorrectAnswer(currentQuestion, answerResult.correctAnswer)}</p>
-                    ) : (
-                      <p>{answerResult.explanation || `答案：${formatCorrectAnswer(currentQuestion, answerResult.correctAnswer)}`}</p>
-                    )}
+                    <p>{answerResult.explanation || `答案：${formatCorrectAnswer(currentQuestion, answerResult.correctAnswer)}`}</p>
                   </div>
                 )}
                 <div className="questionActions">
